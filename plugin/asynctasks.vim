@@ -408,10 +408,10 @@ function! s:load_parsers(obj)
 				let val = section[key]
 				let func_req_name = "asynctasks_parsers#" . substitute(val, '\.', '_', 'g') ."#requirements"
 				let func_parse_name = "asynctasks_parsers#" . substitute(val, '\.', '_', 'g') ."#parse"
-				if !exists('*' . func_req_name) || !exists('*' . func_parse_name) 
-					" TODO delete section from tasks
-				endif
-				if call(func_req_name, [])
+				if !exists('*' . func_req_name) || !exists('*' . func_parse_name) || !call(func_req_name, [])
+          unlet a:obj['config'][sect]
+          call remove(a:obj['keys'], index(a:obj['keys'], sect))
+        else
 					call call(func_parse_name, [section])
 				endif
 				break
@@ -466,6 +466,7 @@ function! s:cache_load_ini(name)
 		endfor
 	endfor
 	return s:load_parsers(obj)
+  echo obj
 endfunc
 
 
