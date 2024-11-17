@@ -22,7 +22,7 @@ function! asynctasks_parsers#package_json#parse(section, object)
   for key in a:object.keys
     if key == a:section
       for task in l:package_tasks
-        call add(new_keys, a:section . '-' . task)
+        call add(new_keys, a:section . ' ' . task)
       endfor
     else
       call add(new_keys, key)
@@ -37,7 +37,7 @@ function! asynctasks_parsers#package_json#parse(section, object)
       if has_key(a:object.config[key], 'command')
         let command = a:object.config[key].command
         for task in l:package_tasks
-          let new_key = a:section . '-' . task
+          let new_key = a:section . ' ' . task
           let new_config[new_key] = deepcopy(a:object.config[key])
           let new_config[new_key].command = command . ' ' . task
         endfor
