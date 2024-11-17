@@ -406,10 +406,15 @@ function! s:load_parsers(obj)
 		for key in keys(section)
 			if key == 'parser'
 				let val = section[key]
-				let fname = "asynctasks_parsers#" . substitute(val, '\.', '_', 'g') ."#requirements"
-				if exists('*' . fname)
-					call call(fname, [val])
+				let func_req_name = "asynctasks_parsers#" . substitute(val, '\.', '_', 'g') ."#requirements"
+				let func_parse_name = "asynctasks_parsers#" . substitute(val, '\.', '_', 'g') ."#parse"
+				if !exists('*' . func_req_name) || !exists('*' . func_parse_name) 
+					" TODO delete section from tasks
 				endif
+				if call(func_req_name, [])
+					call call(func_parse_name, [section])
+				endif
+				break
 			endif
 		endfor
 	endfor
