@@ -412,7 +412,7 @@ function! s:load_parsers(obj)
           unlet a:obj['config'][sect]
           call remove(a:obj['keys'], index(a:obj['keys'], sect))
         else
-					call call(func_parse_name, [section])
+					call call(func_parse_name, [sect, a:obj])
 				endif
 				break
 			endif
