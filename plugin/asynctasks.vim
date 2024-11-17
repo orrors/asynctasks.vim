@@ -398,6 +398,26 @@ endfunc
 
 
 "----------------------------------------------------------------------
+" load parsers
+"----------------------------------------------------------------------
+function! s:load_parsers(obj)
+	for sect in a:obj.keys
+		let section = a:obj.config[sect]
+		for key in keys(section)
+			if key == 'parser'
+				let val = section[key]
+				let fname = "asynctasks_parsers#" . substitute(val, '\.', '_', 'g') ."#requirements"
+				if exists('*' . fname)
+					call call(fname, [val])
+				endif
+			endif
+		endfor
+	endfor
+	return a:obj
+endfunc
+
+
+"----------------------------------------------------------------------
 " read ini in cache
 "----------------------------------------------------------------------
 function! s:cache_load_ini(name)
@@ -440,7 +460,7 @@ function! s:cache_load_ini(name)
 			let section[key] = val
 		endfor
 	endfor
-	return obj
+	return s:load_parsers(obj)
 endfunc
 
 
