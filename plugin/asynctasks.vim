@@ -398,6 +398,42 @@ endfunc
 
 
 "----------------------------------------------------------------------
+" expand parsers
+"----------------------------------------------------------------------
+function! s:expand_parsers(section, object, tasks)
+	let new_keys = []
+	for key in a:object.keys
+		if key == a:section
+			for task in a:tasks
+				call add(new_keys, a:section . '#' . task)
+			endfor
+		else
+			call add(new_keys, key)
+		endif
+	endfor
+	let a:object.keys = new_keys
+
+	let new_config = {}
+	for key in keys(a:object.config)
+		if key == a:section
+			call remove(a:object.config[key], 'parser')
+			if has_key(a:object.config[key], 'command')
+				let command = a:object.config[key].command
+				for task in a:tasks
+					let new_key = a:section . '#' . task
+					let new_config[new_key] = deepcopy(a:object.config[key])
+					let new_config[new_key].command = command . ' ' . task
+				endfor
+			endif
+		else
+			let new_config[key] = a:object.config[key]
+		endif
+	endfor
+	let a:object.config = new_config
+endfunc
+
+
+"----------------------------------------------------------------------
 " load parsers
 "----------------------------------------------------------------------
 function! s:load_parsers(obj)
@@ -406,13 +442,14 @@ function! s:load_parsers(obj)
 		for key in keys(section)
 			if key == 'parser'
 				let val = section[key]
-				let func_req_name = "asynctasks_parsers#" . substitute(val, '\.', '_', 'g') ."#requirements"
-				let func_parse_name = "asynctasks_parsers#" . substitute(val, '\.', '_', 'g') ."#parse"
+				let func_req_name = "asynctasks_parsers#" . substitute(tolower(val), '\.', '_', 'g') ."#requirements"
+				let func_parse_name = "asynctasks_parsers#" . substitute(tolower(val), '\.', '_', 'g') ."#parse"
 				if !exists('*' . func_req_name) || !exists('*' . func_parse_name) || !call(func_req_name, [])
-          unlet a:obj['config'][sect]
-          call remove(a:obj['keys'], index(a:obj['keys'], sect))
-        else
-					call call(func_parse_name, [sect, a:obj])
+					unlet a:obj['config'][sect]
+					call remove(a:obj['keys'], index(a:obj['keys'], sect))
+				else
+					let tasks = call(func_parse_name, [])
+					call s:expand_parsers(sect, a:obj, tasks)
 				endif
 				break
 			endif
@@ -466,7 +503,7 @@ function! s:cache_load_ini(name)
 		endfor
 	endfor
 	return s:load_parsers(obj)
-  echo obj
+	echo obj
 endfunc
 
 
@@ -498,13 +535,15 @@ endfunc
 
 
 "----------------------------------------------------------------------
-" split 'text:colon/slash' into: [text, colon, slash]
+" split 'text:colon/slash' into: [text, colon, slash], ignore if hashtag
+" is present
 "----------------------------------------------------------------------
 function! s:trinity_split(text)
 	let text = a:text
 	let p1 = stridx(text, ':')
 	let p2 = stridx(text, '/')
-	if p1 < 0 && p2 < 0
+	let p3 = stridx(text, '#')
+	if p3 > 0 || (p1 < 0 && p2 < 0)
 		return [text, '', '']
 	endif
 	let parts = split(text, '[:/]')
@@ -984,7 +1023,7 @@ function! s:api_input(msg, ...)
 		call inputsave()
 		try
 			if a:0 < 3
-				let hr = input(a:msg, text) 
+				let hr = input(a:msg, text)
 			else
 				let hr = input(a:msg, text, a:3)
 			endif
@@ -1486,7 +1525,7 @@ function! s:command_check(command, cwd)
 					call s:warning(t . ' in current buffer')
 					return 4
 				endif
-			endfor	
+			endfor
 		endfor
 	endif
 	if g:asynctasks_strict != 0
@@ -1924,15 +1963,15 @@ endfunc
 
 
 "----------------------------------------------------------------------
-" macro help 
+" macro help
 "----------------------------------------------------------------------
-let s:macros = { 
+let s:macros = {
 			\ 'VIM_FILEPATH': 'File name of current buffer with full path',
 			\ 'VIM_FILENAME': 'File name of current buffer without path',
 			\ 'VIM_FILEDIR': 'Full path of current buffer without the file name',
 			\ 'VIM_FILEEXT': 'File extension of current buffer',
 			\ 'VIM_FILETYPE': 'File type (value of &ft in vim)',
-			\ 'VIM_FILENOEXT': 
+			\ 'VIM_FILENOEXT':
 			\ 'File name of current buffer without path and extension',
 			\ 'VIM_PATHNOEXT':
 			\ 'Current file name with full path but without extension',
@@ -1949,15 +1988,15 @@ let s:macros = {
 			\ 'VIM_GUI': 'Is running under gui ?',
 			\ 'VIM_VERSION': 'Value of v:version',
 			\ 'VIM_COLUMNS': "How many columns in vim's screen",
-			\ 'VIM_LINES': "How many lines in vim's screen", 
+			\ 'VIM_LINES': "How many lines in vim's screen",
 			\ 'VIM_SVRNAME': 'Value of v:servername for +clientserver usage',
 			\ 'VIM_PROFILE': 'Current building profile (debug/release/...)',
 			\ 'WSL_FILEPATH': '(WSL) File name of current buffer with full path',
 			\ 'WSL_FILENAME': '(WSL) File name of current buffer without path',
-			\ 'WSL_FILEDIR': 
+			\ 'WSL_FILEDIR':
 			\ '(WSL) Full path of current buffer without the file name',
 			\ 'WSL_FILEEXT': '(WSL) File extension of current buffer',
-			\ 'WSL_FILENOEXT': 
+			\ 'WSL_FILENOEXT':
 			\ '(WSL) File name of current buffer without path and extension',
 			\ 'WSL_PATHNOEXT':
 			\ '(WSL) Current file name with full path but without extension',
@@ -2196,7 +2235,7 @@ function! asynctasks#finish(what)
 		let t .= ((g:asyncrun_code != 0)? 'failure' : 'success')
 		call s:api_notify(t, ((g:asyncrun_code == 0)? 'info' : 'error'))
 	elseif a:what =~ '^sound:'
-		let previous = get(s:, 'sound_id', '')	
+		let previous = get(s:, 'sound_id', '')
 		if previous
 			call s:api_sound_stop(previous)
 		endif
@@ -2289,11 +2328,11 @@ command! -bang -nargs=* -range=0 -complete=customlist,s:complete AsyncTask
 "----------------------------------------------------------------------
 " help commands
 "----------------------------------------------------------------------
-command! -bang -nargs=? -complete=customlist,s:complete_edit AsyncTaskEdit 
-			\ call asynctasks#cmd('', 
+command! -bang -nargs=? -complete=customlist,s:complete_edit AsyncTaskEdit
+			\ call asynctasks#cmd('',
 			\ (('<bang>' == '')? '-e' : '-E') . ' ' . <q-args>)
 
-command! -bang -nargs=0 AsyncTaskList 
+command! -bang -nargs=0 AsyncTaskList
 			\ call asynctasks#cmd('', ('<bang>' == '')? '-l' : '-L')
 
 command! -bang -nargs=0 AsyncTaskMacro
@@ -2361,7 +2400,7 @@ endfunc
 
 
 "----------------------------------------------------------------------
-" return ini content 
+" return ini content
 "----------------------------------------------------------------------
 function! asynctasks#content(path, name)
 	let task = asynctasks#inspect(a:path, a:name)
@@ -2487,7 +2526,7 @@ endfunc
 
 
 "----------------------------------------------------------------------
-" AsyncTaskEnviron 
+" AsyncTaskEnviron
 "----------------------------------------------------------------------
 function! s:task_environ(bang, ...)
 	let args = a:000
@@ -2625,7 +2664,7 @@ function! s:complete_environ(ArgLead, CmdLine, CursorPos)
 	return candidate
 endfunc
 
-command! -bang -nargs=* -complete=customlist,s:complete_environ 
+command! -bang -nargs=* -complete=customlist,s:complete_environ
 		\ AsyncTaskEnviron  call s:task_environ('<bang>', <f-args>)
 
 
